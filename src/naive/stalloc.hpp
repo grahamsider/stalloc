@@ -9,7 +9,7 @@ constexpr size_t offset(void* ptr, void* base) { return (size_t)ptr - (size_t)ba
 template<size_t MAX_SIZE, typename T = void>
 class stalloc_t {
     private:
-        char* m_data[MAX_SIZE] = {0};
+        char m_data[MAX_SIZE] = {0};
         size_t m_sizes[MAX_SIZE] = {0};
 
     public:
