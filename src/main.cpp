@@ -21,10 +21,10 @@ int main() {
     stalloc_t<4096> vstk;
 
     // Allocate, set, and free valid array
-    const size_t mem2_size = 16;
-    int* mem2 = static_cast<int*>(vstk.alloc(mem2_size));
-    for (size_t i = 0; i < mem2_size; i++) mem2[i] = i;
-    for (size_t i = 0; i < mem2_size; i++) std::cout << pr_inf << "mem2[i] = " << mem2[i] << std::endl;
+    const size_t mem2_len = 16;
+    int* mem2 = static_cast<int*>(vstk.alloc(mem2_len * sizeof(int)));
+    for (size_t i = 0; i < mem2_len; i++) mem2[i] = i;
+    for (size_t i = 0; i < mem2_len; i++) std::cout << pr_inf << "mem2[i] = " << mem2[i] << std::endl;
     vstk.free(mem2);
 
     return 0;
