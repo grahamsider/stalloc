@@ -7,9 +7,6 @@
 
 template<size_t MaxSize, typename T = void>
 class stalloc_t {
-    /* Ensure T is a trivially copyable type (or void) */
-    static_assert(std::is_trivially_copyable_v<T> || std::is_void_v<T>);
-
     /* Word and double-word sizes, architecture dependant (bytes) */
     /* Note: On 64-bit architectures, alignment (DSIZE) is 16 bytes */
     static constexpr size_t WSIZE = sizeof(void*);
@@ -46,6 +43,12 @@ class stalloc_t {
     static constexpr size_t ALIGN_MASK(size_t x, size_t m) { return (x + m) & (~m); }
     static constexpr size_t ALIGN_UP(size_t x) { return ALIGN_MASK(x, DSIZE-1); }
     static constexpr size_t ALIGN_SIZE(size_t x) { return (x > DSIZE) ? ALIGN_UP(x) + DSIZE : 2 * DSIZE; }
+
+    /* Ensure T is a trivially copyable type (or void) */
+    static_assert(std::is_trivially_copyable_v<T> || std::is_void_v<T>);
+
+    /* Ensure MaxSize is double-word aligned and can fit at least one block */
+    static_assert(((MaxSize & (DSIZE-1)) == 0) && (MaxSize >= 3 * DSIZE));
 
     private:
         unsigned char m_data[MaxSize] = {0};
