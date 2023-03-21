@@ -2,6 +2,9 @@
 #include <cassert>
 #include "stalloc.hpp"
 
+#define pr_inf "inf[" << __func__ << "]: "
+#define pr_err "err[" << __func__ << "]: "
+
 int main() {
     stalloc_t<4096, int> st;
 

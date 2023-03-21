@@ -1,9 +1,9 @@
 #pragma once
-#include <iostream>
-#include <type_traits>
 
-#define pr_inf "inf[" << __func__ << "]: "
-#define pr_err "err[" << __func__ << "]: "
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <type_traits>
 
 template<size_t MaxSize, typename T = void>
 class stalloc_t {
