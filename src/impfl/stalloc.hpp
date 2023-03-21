@@ -1,11 +1,15 @@
 #pragma once
 #include <iostream>
+#include <type_traits>
 
 #define pr_inf "inf[" << __func__ << "]: "
 #define pr_err "err[" << __func__ << "]: "
 
 template<size_t MaxSize, typename T = void>
 class stalloc_t {
+    /* Ensure T is a trivially copyable type */
+    static_assert(std::is_trivially_copyable_v<T>);
+
     /* Word and double-word sizes, architecture dependant (bytes) */
     /* Note: On 64-bit architectures, alignment (DSIZE) is 16 bytes */
     static constexpr size_t WSIZE = sizeof(void*);
