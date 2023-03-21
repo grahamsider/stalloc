@@ -71,6 +71,9 @@ class stalloc_t {
 
 /**
  * stalloc_t::printb()
+ *
+ * Print a formatted representation of the instantiated stack
+ * allocator's block list.
  */
 template<size_t MaxSize, typename T>
 void stalloc_t<MaxSize, T>::printb() {
@@ -90,6 +93,9 @@ void stalloc_t<MaxSize, T>::printb() {
 
 /**
  * stalloc_t::find_fit()
+ *
+ * First fit free block finder. Returns pointer to the allotted
+ * block if fit is found. Otherwise returns nullptr.
  */
 template<size_t MaxSize, typename T>
 void* stalloc_t<MaxSize, T>::find_fit(size_t asize) {
@@ -101,6 +107,11 @@ void* stalloc_t<MaxSize, T>::find_fit(size_t asize) {
 
 /**
  * stalloc_t::place()
+ *
+ * Sets the header and footer of the allotted block and leftover
+ * block (when applicable) to (total_size | 1) to complete allocation.
+ * The size placed in the header/footer includes that of the header and
+ * footer themselves.
  */
 template<size_t MaxSize, typename T>
 void stalloc_t<MaxSize, T>::place(void* bp, size_t asize) {
@@ -124,6 +135,19 @@ void stalloc_t<MaxSize, T>::place(void* bp, size_t asize) {
 
 /**
  * stalloc_t::alloc()
+ *
+ * Public facing allocation subroutine. Attempts to find a free
+ * block of adequate size for the request. Returns a pointer to
+ * the start of that free block on success. Returns nullptr on
+ * failure.
+ *
+ * The block header is one word prior to the start of the newly
+ * allotted block whose address is returned to the user. Similarly,
+ * the block footer is located directly after the end of the aligned
+ * block.
+ *
+ * The start address of the newly allotted block is always double-
+ * word aligned, as is the size of the block.
  */
 template<size_t MaxSize, typename T>
 T* stalloc_t<MaxSize, T>::alloc(size_t size) {
@@ -142,6 +166,12 @@ T* stalloc_t<MaxSize, T>::alloc(size_t size) {
 
 /**
  * stalloc_t::free()
+ *
+ * Public facing de-allocation subroutine. Attempts to free the
+ * given block whose pointer is provided by the user. Silently
+ * fails if given an invalid request.
+ *
+ * On success attempts to coalesce adjacent free blocks.
  */
 template<size_t MaxSize, typename T>
 void stalloc_t<MaxSize, T>::free(T* bp) {
@@ -160,6 +190,10 @@ void stalloc_t<MaxSize, T>::free(T* bp) {
 
 /**
  * stalloc_t::coalesce()
+ *
+ * Attempt to coalesce adjacent free blocks. In order to coalesce,
+ * adjacent block must both exist (i.e. given block pointer is not
+ * at a boundary) and have its alloc flag set to false.
  */
 template<size_t MaxSize, typename T>
 void stalloc_t<MaxSize, T>::coalesce(void* bp) {
