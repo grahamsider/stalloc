@@ -6,7 +6,7 @@
 #define pr_err "err[" << __func__ << "]: "
 
 int main() {
-    stalloc_t<4096, int> st;
+    stalloc_t<4096, int, stalloc_fit_t::best_fit> st;
 
     int* i = nullptr;
     int* j = nullptr;
@@ -104,6 +104,41 @@ int main() {
     for (int idx = 124; idx >= 0; idx -= 2) {
         st.free(abuf[idx]);
         abuf[idx] = nullptr;
+    }
+    st.printb();
+
+    /* Allocate seven blocks of decreasing size (256B -> 64B) */
+    std::cout << std::endl << pr_inf << "allocating seven blocks of decreasing size" << std::endl;
+    int* bbuf[7];
+    for (int idx = 0; idx < 7; idx++) {
+        bbuf[idx] = st.alloc(256 - (32 * idx));
+        assert(bbuf[idx]);
+    }
+    st.printb();
+
+    /* Free every second block in the seven block array */
+    std::cout << std::endl << pr_inf << "freeing every second block in the seven block array" << std::endl;
+    for (int idx = 1; idx < 7; idx += 2) {
+        st.free(bbuf[idx]);
+        bbuf[idx] = nullptr;
+    }
+    st.printb();
+
+    /* Allocate new blocks the same size as the previously freed ones
+     * This should result in the same block allocations when using best fit,
+     * but a different (less ideal) block allocation when using first fit */
+    std::cout << std::endl << pr_inf << "re-allocating the previously freed blocks backwards" << std::endl;
+    for (int idx = 5; idx > 0; idx -= 2) {
+        bbuf[idx] = st.alloc(256 - (32 * idx));
+        assert(bbuf[idx]);
+    }
+    st.printb();
+
+    /* Free all blocks from first to last */
+    std::cout << std::endl << pr_inf << "freeing blocks from first to last" << std::endl;
+    for (int idx = 0; idx < 7; idx++) {
+        st.free(bbuf[idx]);
+        bbuf[idx] = nullptr;
     }
     st.printb();
 

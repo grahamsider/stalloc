@@ -5,7 +5,9 @@
 #include <cstdio>
 #include <type_traits>
 
-template<size_t MaxSize, typename T = void>
+enum stalloc_fit_t { first_fit, best_fit };
+
+template<size_t MaxSize, typename T = void, stalloc_fit_t F = stalloc_fit_t::first_fit>
 class stalloc_t {
     /* Word and double-word sizes, architecture dependant (bytes) */
     /* Note: On 64-bit architectures, alignment (DSIZE) is 16 bytes */
@@ -78,8 +80,8 @@ class stalloc_t {
  * Print a formatted representation of the instantiated stack
  * allocator's block list.
  */
-template<size_t MaxSize, typename T>
-void stalloc_t<MaxSize, T>::printb() {
+template<size_t MaxSize, typename T, stalloc_fit_t F>
+void stalloc_t<MaxSize, T, F>::printb() {
     printf("+------------------------------------------------+\n"
            "|                      Stack                     |\n"
            "+-------+----------------+--------------+--------+\n"
@@ -97,15 +99,38 @@ void stalloc_t<MaxSize, T>::printb() {
 /**
  * stalloc_t::find_fit()
  *
- * First fit free block finder. Returns pointer to the allotted
+ * Free block fit finder. Returns pointer to the allotted
  * block if fit is found. Otherwise returns nullptr.
+ *
+ * Fit algorithm may be chosen at compile time/instantiation
+ * via the stalloc_fit_t type template parameter. Defaults to
+ * stalloc_type_t::first_fit.
  */
-template<size_t MaxSize, typename T>
-void* stalloc_t<MaxSize, T>::find_fit(size_t asize) {
-    for (void* lp = m_listp; GET_SIZE(HDRP(lp)) > 0; lp = NEXT_BLKP(lp))
-        if (!GET_ALLOC(HDRP(lp)) && asize <= GET_SIZE(HDRP(lp)))
-            return lp;
-    return nullptr;
+template<size_t MaxSize, typename T, stalloc_fit_t F>
+void* stalloc_t<MaxSize, T, F>::find_fit(size_t asize) {
+
+    /* First Fit */
+    if constexpr (F == stalloc_fit_t::first_fit) {
+        for (void* lp = m_listp; GET_SIZE(HDRP(lp)) > 0; lp = NEXT_BLKP(lp))
+            if (!GET_ALLOC(HDRP(lp)) && asize <= GET_SIZE(HDRP(lp)))
+                return lp;
+        return nullptr;
+    }
+
+    /* Best Fit */
+    if constexpr (F == stalloc_fit_t::best_fit) {
+        void* bp = nullptr;
+        size_t bp_size = ~((size_t)0);
+
+        for (void* lp = m_listp; GET_SIZE(HDRP(lp)) > 0; lp = NEXT_BLKP(lp)) {
+            size_t lp_size = GET_SIZE(HDRP(lp));
+            if (!GET_ALLOC(HDRP(lp)) && asize <= lp_size && lp_size < bp_size) {
+                bp = lp;
+                bp_size = lp_size;
+            }
+        }
+        return bp;
+    }
 }
 
 /**
@@ -116,8 +141,8 @@ void* stalloc_t<MaxSize, T>::find_fit(size_t asize) {
  * The size placed in the header/footer includes that of the header and
  * footer themselves.
  */
-template<size_t MaxSize, typename T>
-void stalloc_t<MaxSize, T>::place(void* bp, size_t asize) {
+template<size_t MaxSize, typename T, stalloc_fit_t F>
+void stalloc_t<MaxSize, T, F>::place(void* bp, size_t asize) {
     /* Get current (free) block size and leftover block size */
     size_t fsize = GET_SIZE(HDRP(bp));
     size_t lsize = fsize - asize;
@@ -152,8 +177,8 @@ void stalloc_t<MaxSize, T>::place(void* bp, size_t asize) {
  * The start address of the newly allotted block is always double-
  * word aligned, as is the size of the block.
  */
-template<size_t MaxSize, typename T>
-T* stalloc_t<MaxSize, T>::alloc(size_t size) {
+template<size_t MaxSize, typename T, stalloc_fit_t F>
+T* stalloc_t<MaxSize, T, F>::alloc(size_t size) {
     /* Ignore zero-sized and known-too-large requests */
     if (!size || size > MaxSize - (2 * DSIZE))
         return nullptr;
@@ -176,8 +201,8 @@ T* stalloc_t<MaxSize, T>::alloc(size_t size) {
  *
  * On success attempts to coalesce adjacent free blocks.
  */
-template<size_t MaxSize, typename T>
-void stalloc_t<MaxSize, T>::free(T* bp) {
+template<size_t MaxSize, typename T, stalloc_fit_t F>
+void stalloc_t<MaxSize, T, F>::free(T* bp) {
     void* vbp = static_cast<void*>(bp);
 
     /* Ignore invalid requests */
@@ -198,8 +223,8 @@ void stalloc_t<MaxSize, T>::free(T* bp) {
  * adjacent block must both exist (i.e. given block pointer is not
  * at a boundary) and have its alloc flag set to false.
  */
-template<size_t MaxSize, typename T>
-void stalloc_t<MaxSize, T>::coalesce(void* bp) {
+template<size_t MaxSize, typename T, stalloc_fit_t F>
+void stalloc_t<MaxSize, T, F>::coalesce(void* bp) {
     bool prev = PREV_EXIST(bp) && !GET_ALLOC(HDRP(PREV_BLKP(bp)));
     bool next = NEXT_EXIST(bp) && !GET_ALLOC(HDRP(NEXT_BLKP(bp)));
 
