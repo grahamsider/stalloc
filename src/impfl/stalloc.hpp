@@ -141,17 +141,17 @@ T* stalloc_t<MaxSize, T>::alloc(size_t size) {
  */
 template<size_t MaxSize, typename T>
 void stalloc_t<MaxSize, T>::free(T* bp) {
-    bp = static_cast<void*>(bp);
+    void* vbp = static_cast<void*>(bp);
 
     /* Ignore invalid requests */
-    if (!bp || !GET_ALLOC(HDRP(bp)))
+    if (!vbp || !GET_ALLOC(HDRP(vbp)))
         return;
 
-    size_t size = GET_SIZE(HDRP(bp));
-    PUT(HDRP(bp), PACK(size, false));
-    PUT(FTRP(bp), PACK(size, false));
+    size_t size = GET_SIZE(HDRP(vbp));
+    PUT(HDRP(vbp), PACK(size, false));
+    PUT(FTRP(vbp), PACK(size, false));
 
-    coalesce(bp);
+    coalesce(vbp);
 }
 
 /**
