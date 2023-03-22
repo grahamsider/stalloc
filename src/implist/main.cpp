@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cassert>
+#include <chrono>
 #include "stalloc.hpp"
 
 #define pr_inf "inf[" << __func__ << "]: "
@@ -141,6 +142,31 @@ int main() {
         bbuf[idx] = nullptr;
     }
     st.printb();
+
+    /* Allocate and free entire buffer many times */
+    std::cout << std::endl << pr_inf << "running performance test (65,536 loops)..." << std::endl;;
+    auto start_time = std::chrono::high_resolution_clock::now();
+    for (int l = 0; l < 65536; l++) {
+        for (int idx = 0; idx < 126; idx++) {
+            abuf[idx] = st.alloc(4 * sizeof(int));
+            assert(abuf[idx]);
+        }
+        i = st.alloc(8 * sizeof(int));
+        assert(i);
+        for (int idx = 1; idx < 126; idx += 2) {
+            st.free(abuf[idx]);
+            abuf[idx] = nullptr;
+        }
+        st.free(i);
+        i = nullptr;
+        for (int idx = 124; idx >= 0; idx -= 2) {
+            st.free(abuf[idx]);
+            abuf[idx] = nullptr;
+        }
+    }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto dur_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    std::cout << pr_inf << "performance test done [" << dur_time.count() / 1000. << "s]" << std::endl;
 
     return 0;
 }
