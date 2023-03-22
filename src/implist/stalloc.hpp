@@ -54,11 +54,11 @@ class stalloc_t {
 
     private:
         unsigned char m_data[MaxSize] = {0};
-        void* m_listp = m_data + DSIZE;
+        void* const m_listp = m_data + DSIZE;
 
-        void* find_fit(size_t asize);
-        void place(void* bp, size_t asize);
-        void coalesce(void* bp);
+        void* find_fit(const size_t asize);
+        void place(void* const bp, size_t asize);
+        void coalesce(void* const bp);
 
     public:
         stalloc_t() {
@@ -67,8 +67,8 @@ class stalloc_t {
             PUT(FTRP(m_data + DSIZE), PACK(MaxSize - DSIZE, false));
         };
 
-        T* alloc(size_t size);
-        void free(T* bp);
+        [[nodiscard]] T* alloc(const size_t size);
+        void free(T* const bp);
 
         /* Debug */
         void printb();
@@ -107,8 +107,7 @@ void stalloc_t<MaxSize, T, F>::printb() {
  * stalloc_type_t::first_fit.
  */
 template<size_t MaxSize, typename T, stalloc_fit_t F>
-void* stalloc_t<MaxSize, T, F>::find_fit(size_t asize) {
-
+void* stalloc_t<MaxSize, T, F>::find_fit(const size_t asize) {
     /* First Fit */
     if constexpr (F == stalloc_fit_t::first_fit) {
         for (void* lp = m_listp; GET_SIZE(HDRP(lp)) > 0; lp = NEXT_BLKP(lp))
@@ -116,14 +115,13 @@ void* stalloc_t<MaxSize, T, F>::find_fit(size_t asize) {
                 return lp;
         return nullptr;
     }
-
     /* Best Fit */
     if constexpr (F == stalloc_fit_t::best_fit) {
         void* bp = nullptr;
         size_t bp_size = ~((size_t)0);
 
         for (void* lp = m_listp; GET_SIZE(HDRP(lp)) > 0; lp = NEXT_BLKP(lp)) {
-            size_t lp_size = GET_SIZE(HDRP(lp));
+            const size_t lp_size = GET_SIZE(HDRP(lp));
             if (!GET_ALLOC(HDRP(lp)) && asize <= lp_size && lp_size < bp_size) {
                 bp = lp;
                 bp_size = lp_size;
@@ -142,10 +140,10 @@ void* stalloc_t<MaxSize, T, F>::find_fit(size_t asize) {
  * footer themselves.
  */
 template<size_t MaxSize, typename T, stalloc_fit_t F>
-void stalloc_t<MaxSize, T, F>::place(void* bp, size_t asize) {
+void stalloc_t<MaxSize, T, F>::place(void* const bp, size_t asize) {
     /* Get current (free) block size and leftover block size */
-    size_t fsize = GET_SIZE(HDRP(bp));
-    size_t lsize = fsize - asize;
+    const size_t fsize = GET_SIZE(HDRP(bp));
+    const size_t lsize = fsize - asize;
 
     /* If leftover size is too small for another block, use all of free
      * block size. Otherwise set leftover block size accordingly */
@@ -178,13 +176,13 @@ void stalloc_t<MaxSize, T, F>::place(void* bp, size_t asize) {
  * word aligned, as is the size of the block.
  */
 template<size_t MaxSize, typename T, stalloc_fit_t F>
-T* stalloc_t<MaxSize, T, F>::alloc(size_t size) {
+T* stalloc_t<MaxSize, T, F>::alloc(const size_t size) {
     /* Ignore zero-sized and known-too-large requests */
     if (!size || size > MaxSize - (2 * DSIZE))
         return nullptr;
 
     void* bp = nullptr;
-    size_t asize = ALIGN_SIZE(size);
+    const size_t asize = ALIGN_SIZE(size);
 
     if ((bp = find_fit(asize)))
         place(bp, asize);
@@ -202,14 +200,14 @@ T* stalloc_t<MaxSize, T, F>::alloc(size_t size) {
  * On success attempts to coalesce adjacent free blocks.
  */
 template<size_t MaxSize, typename T, stalloc_fit_t F>
-void stalloc_t<MaxSize, T, F>::free(T* bp) {
-    void* vbp = static_cast<void*>(bp);
+void stalloc_t<MaxSize, T, F>::free(T* const bp) {
+    void* const vbp = static_cast<void*>(bp);
 
     /* Ignore invalid requests */
     if (!vbp || !GET_ALLOC(HDRP(vbp)))
         return;
 
-    size_t size = GET_SIZE(HDRP(vbp));
+    const size_t size = GET_SIZE(HDRP(vbp));
     PUT(HDRP(vbp), PACK(size, false));
     PUT(FTRP(vbp), PACK(size, false));
 
@@ -224,27 +222,28 @@ void stalloc_t<MaxSize, T, F>::free(T* bp) {
  * at a boundary) and have its alloc flag set to false.
  */
 template<size_t MaxSize, typename T, stalloc_fit_t F>
-void stalloc_t<MaxSize, T, F>::coalesce(void* bp) {
-    bool prev = PREV_EXIST(bp) && !GET_ALLOC(HDRP(PREV_BLKP(bp)));
-    bool next = NEXT_EXIST(bp) && !GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+void stalloc_t<MaxSize, T, F>::coalesce(void* const bp) {
+    const bool prev = PREV_EXIST(bp) && !GET_ALLOC(HDRP(PREV_BLKP(bp)));
+    const bool next = NEXT_EXIST(bp) && !GET_ALLOC(HDRP(NEXT_BLKP(bp)));
 
     void* prev_hdrp = nullptr;
     void* prev_ftrp = nullptr;
     void* next_hdrp = nullptr;
     void* next_ftrp = nullptr;
+    size_t size = GET_SIZE(HDRP(bp));
 
     if (prev) {
         prev_hdrp = HDRP(PREV_BLKP(bp));
         prev_ftrp = FTRP(PREV_BLKP(bp));
+        size += GET_SIZE(prev_hdrp);
     }
     if (next) {
         next_hdrp = HDRP(NEXT_BLKP(bp));
         next_ftrp = FTRP(NEXT_BLKP(bp));
+        size += GET_SIZE(next_hdrp);
     }
 
     if (prev && next) {
-        size_t size = GET_SIZE(prev_hdrp) + GET_SIZE(HDRP(bp)) + GET_SIZE(next_hdrp);
-
         PUT(prev_ftrp, 0);
         PUT(prev_hdrp, PACK(size, false));
 
@@ -254,16 +253,12 @@ void stalloc_t<MaxSize, T, F>::coalesce(void* bp) {
         PUT(FTRP(bp), 0);
         PUT(HDRP(bp), 0);
     } else if (prev) {
-        size_t size = GET_SIZE(prev_hdrp) + GET_SIZE(HDRP(bp));
-
         PUT(prev_ftrp, 0);
         PUT(prev_hdrp, PACK(size, false));
 
         PUT(FTRP(bp), PACK(size, false));
         PUT(HDRP(bp), 0);
     } else if (next) {
-        size_t size = GET_SIZE(next_hdrp) + GET_SIZE(HDRP(bp));
-
         PUT(next_ftrp, PACK(size, false));
         PUT(next_hdrp, 0);
 
