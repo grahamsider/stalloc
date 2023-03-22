@@ -186,7 +186,7 @@ T* stalloc_t<MaxSize, T, F>::alloc(size_t size) {
     void* bp = nullptr;
     size_t asize = ALIGN_SIZE(size);
 
-    if (bp = find_fit(asize))
+    if ((bp = find_fit(asize)))
         place(bp, asize);
 
     return static_cast<T*>(bp);
