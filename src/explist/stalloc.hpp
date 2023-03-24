@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <type_traits>
-#include <cassert>
 
 enum stalloc_fit_t { first_fit, best_fit };
 enum stalloc_ord_t { lifo_order, addr_order };
