@@ -1,5 +1,5 @@
 CXX       := g++
-CXXFLAGS  := -pedantic-errors -Wall -Wextra -Werror
+CXXFLAGS  := -pedantic-errors -Wall -Wextra -Werror -O2
 TARGETS   := implist
 SRC_DIR   := ./src
 BUILD_DIR := ./build
