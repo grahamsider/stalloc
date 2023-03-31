@@ -118,6 +118,12 @@ void stalloc_t<MaxSize, T, F, O>::printb() {
 
 /**
  * stalloc_t::fl_insert()
+ *
+ * Insert block into freelist.
+ *
+ * Order algorithm may be chosen at compile time/instantiation
+ * via the stalloc_ord_t type template parameter. Defaults to
+ * stalloc_ord_t::lifo_order.
  */
 template<size_t MaxSize, typename T, stalloc_fit_t F, stalloc_ord_t O>
 void stalloc_t<MaxSize, T, F, O>::fl_insert(void* const bp) {
@@ -171,6 +177,8 @@ void stalloc_t<MaxSize, T, F, O>::fl_insert(void* const bp) {
 
 /**
  * stalloc_t::fl_remove()
+ *
+ * Remove block from freelist.
  */
 template<size_t MaxSize, typename T, stalloc_fit_t F, stalloc_ord_t O>
 void stalloc_t<MaxSize, T, F, O>::fl_remove(void* const bp) {
