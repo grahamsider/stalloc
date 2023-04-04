@@ -49,9 +49,9 @@ class stalloc_t {
     static constexpr size_t ALIGN_UP(size_t x) { return ALIGN_MASK(x, DSIZE-1); }
     static constexpr size_t ALIGN_SIZE(size_t x) { return (x > DSIZE) ? ALIGN_UP(x) + DSIZE : 2 * DSIZE; }
 
-    /* Number of segregated freelist ranges */
-    static constexpr size_t FLIST_NRANGES = std::bit_width(MaxSize) - std::bit_width(DSIZE);
-    static constexpr size_t FLIST_RANGE(size_t x) { return floor(log2(x)) - std::bit_width(DSIZE) - 1; }
+    /* Segregated freelist range helper and number of ranges constant */
+    static constexpr size_t FLIST_RANGE(size_t x) { return std::bit_width(x) - std::bit_width(DSIZE); }
+    static constexpr size_t FLIST_NRANGES = FLIST_RANGE(MaxSize);
 
     /* Ensure T is a trivially copyable type (or void) */
     static_assert(std::is_trivially_copyable_v<T> || std::is_void_v<T>);
@@ -133,6 +133,7 @@ void stalloc_t<MaxSize, T, F, O>::printb() {
  */
 template<size_t MaxSize, typename T, stalloc_fit_t F, stalloc_ord_t O>
 void stalloc_t<MaxSize, T, F, O>::fl_insert(void* const bp) {
+    const size_t fl_ridx = FLIST_RANGE(GET_SIZE(HDRP(bp)));
     fl_t* const fbp = static_cast<fl_t*>(bp);
 
     /* Ignore invalid requests */
@@ -140,31 +141,31 @@ void stalloc_t<MaxSize, T, F, O>::fl_insert(void* const bp) {
         return;
 
     /* If freelist is empty, fbp is new start of freelist */
-    if (!m_flistp) {
-        m_flistp = fbp;
-        m_flistp->prev = nullptr;
-        m_flistp->next = nullptr;
+    if (!m_flistp[fl_ridx]) {
+        m_flistp[fl_ridx] = fbp;
+        m_flistp[fl_ridx]->prev = nullptr;
+        m_flistp[fl_ridx]->next = nullptr;
         return;
     }
 
     /* LIFO Ordering */
     if constexpr (O == stalloc_ord_t::lifo_order) {
         fbp->prev = nullptr;
-        fbp->next = m_flistp;
-        m_flistp->prev = fbp;
-        m_flistp = fbp;
+        fbp->next = m_flistp[fl_ridx];
+        m_flistp[fl_ridx]->prev = fbp;
+        m_flistp[fl_ridx] = fbp;
     }
     /* Address Ordering */
     if constexpr (O == stalloc_ord_t::addr_order) {
-        if (fbp < m_flistp) {
+        if (fbp < m_flistp[fl_ridx]) {
             fbp->prev = nullptr;
-            fbp->next = m_flistp;
-            m_flistp->prev = fbp;
-            m_flistp = fbp;
+            fbp->next = m_flistp[fl_ridx];
+            m_flistp[fl_ridx]->prev = fbp;
+            m_flistp[fl_ridx] = fbp;
             return;
         }
 
-        fl_t* flp = m_flistp;
+        fl_t* flp = m_flistp[fl_ridx];
         while (flp->next && flp < fbp)
             flp = flp->next;
 
@@ -188,6 +189,7 @@ void stalloc_t<MaxSize, T, F, O>::fl_insert(void* const bp) {
  */
 template<size_t MaxSize, typename T, stalloc_fit_t F, stalloc_ord_t O>
 void stalloc_t<MaxSize, T, F, O>::fl_remove(void* const bp) {
+    const size_t fl_ridx = FLIST_RANGE(GET_SIZE(HDRP(bp)));
     fl_t* const fbp = static_cast<fl_t*>(bp);
 
     /* Ignore invalid requests */
@@ -196,12 +198,12 @@ void stalloc_t<MaxSize, T, F, O>::fl_remove(void* const bp) {
 
     /* Only block in freelist */
     if (!fbp->prev && !fbp->next) {
-        m_flistp = nullptr;
+        m_flistp[fl_ridx] = nullptr;
     }
     /* Located at head of freelist */
     else if (!fbp->prev) {
-        m_flistp = fbp->next;
-        m_flistp->prev = nullptr;
+        m_flistp[fl_ridx] = fbp->next;
+        m_flistp[fl_ridx]->prev = nullptr;
         fbp->next = nullptr;
     }
     /* Located at tail of freelist */
@@ -233,7 +235,7 @@ void* stalloc_t<MaxSize, T, F, O>::find_fit(const size_t asize) {
     size_t fl_ridx = FLIST_RANGE(asize);
 
     for (; fl_ridx < FLIST_NRANGES; fl_ridx++) {
-        fl_t* flp = m_flistp[fl_ridx]
+        fl_t* flp = m_flistp[fl_ridx];
 
         /* First Fit */
         if constexpr (F == stalloc_fit_t::first_fit) {
@@ -364,6 +366,7 @@ void stalloc_t<MaxSize, T, F, O>::coalesce(void* const bp) {
     void* prev_ftrp = nullptr;
     void* next_hdrp = nullptr;
     void* next_ftrp = nullptr;
+    void* new_bp = nullptr;
     size_t size = GET_SIZE(HDRP(bp));
 
     if (prev) {
@@ -378,8 +381,10 @@ void stalloc_t<MaxSize, T, F, O>::coalesce(void* const bp) {
     }
 
     if (prev && next) {
+        new_bp = PREV_BLKP(bp);
         fl_remove(NEXT_BLKP(bp));
         fl_remove(bp);
+        fl_remove(new_bp);
 
         PUT(prev_ftrp, 0);
         PUT(prev_hdrp, PACK(size, false));
@@ -390,7 +395,9 @@ void stalloc_t<MaxSize, T, F, O>::coalesce(void* const bp) {
         PUT(FTRP(bp), 0);
         PUT(HDRP(bp), 0);
     } else if (prev) {
+        new_bp = PREV_BLKP(bp);
         fl_remove(bp);
+        fl_remove(new_bp);
 
         PUT(prev_ftrp, 0);
         PUT(prev_hdrp, PACK(size, false));
@@ -398,7 +405,9 @@ void stalloc_t<MaxSize, T, F, O>::coalesce(void* const bp) {
         PUT(FTRP(bp), PACK(size, false));
         PUT(HDRP(bp), 0);
     } else if (next) {
+        new_bp = bp;
         fl_remove(NEXT_BLKP(bp));
+        fl_remove(new_bp);
 
         PUT(next_ftrp, PACK(size, false));
         PUT(next_hdrp, 0);
@@ -406,4 +415,6 @@ void stalloc_t<MaxSize, T, F, O>::coalesce(void* const bp) {
         PUT(FTRP(bp), 0);
         PUT(HDRP(bp), PACK(size, false));
     }
+
+    if (new_bp) fl_insert(new_bp);
 }
