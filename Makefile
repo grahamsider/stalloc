@@ -1,6 +1,6 @@
 CXX       := g++
-CXXFLAGS  := -pedantic-errors -Wall -Wextra -Werror -O2
-TARGETS   := implist explist
+CXXFLAGS  := -std=c++20 -pedantic-errors -Wall -Wextra -Werror -O2
+TARGETS   := implist explist seglist
 SRC_DIR   := ./src
 BUILD_DIR := ./build
 
